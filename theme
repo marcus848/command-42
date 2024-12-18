@@ -1,0 +1,127 @@
+#!/bin/bash
+
+# Função para definir as cores dos temas
+define_colors() {
+    case "$1" in
+        catppuccin)
+            default_color="#000000" # Cor padrão do tema tokyonight
+            case "$2" in
+                frappe)
+                    color="#303446"
+                    ;;
+                latte)
+                    color="#eff1f5"
+                    ;;
+                macchiato)
+                    color="#24273a"
+                    ;;
+		mocha)
+		    color="#1e1e2e"
+		    ;;
+                *)
+                    color=$default_color
+                    ;;
+            esac
+            ;;
+        tokyonight)
+            default_color="#1a1b26" # Cor padrão do tema tokyonight
+            case "$2" in
+	    	day)
+		    color="#e1e2e7"
+		    ;;
+                moon)
+                    color="#222436"
+                    ;;
+                night)
+                    color="#1a1b26"
+                    ;;
+                storm)
+                    color="#24283b"
+                    ;;
+                *)
+                    color=$default_color
+                    ;;
+            esac
+            ;;
+
+        dracula)
+            default_color="#282a36" # Cor padrão do tema tokyonight
+            case "$2" in
+                soft)
+                    color="#1e1f29"
+                    ;;
+                *)
+                    color=$default_color
+                    ;;
+            esac
+            ;;
+        gruvbox)
+            default_color="#282828" # Cor padrão do tema gruvbox
+            case "$2" in
+                *)
+                    color=$default_color
+                    ;;
+            esac
+            ;;
+	nightfox)
+	    default_color="#2e3440" # Cor padrão do tema nightfox
+	    case "$2" in
+	    	*)
+		    color=$default_color
+		    ;;
+	    esac
+	    ;;
+	nord)
+	    default_color="#2f3540" # Cor padrão do tema nord
+	    case "$2" in
+	    	*)
+		    color=$default_color
+		    ;;
+	    esac
+	    ;;
+        *)
+            echo "Tema desconhecido: $1"
+            exit 1
+            ;;
+    esac
+}
+
+# Verifica se ao menos um argumento foi passado
+if [ -z "$1" ]; then
+    echo "Uso: $0 {theme} [subtheme]"
+    exit 1
+fi
+
+# Define o tema e o subtema
+theme=$1
+subtheme=$2
+
+define_colors "$theme" "$subtheme"
+
+# Obtém o UUID do perfil "unnamed" do GNOME Terminal
+profile=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
+
+# Verifica se o perfil foi encontrado
+if [ -z "$profile" ]; then
+    echo "Erro: não foi possível obter o perfil padrão do GNOME Terminal."
+    exit 1
+fi
+
+# Altera a cor de fundo do terminal GNOME
+schema="/org/gnome/terminal/legacy/profiles:/:$profile/"
+
+if gsettings writable "org.gnome.Terminal.Legacy.Profile:$schema" background-color &> /dev/null; then
+    gsettings set "org.gnome.Terminal.Legacy.Profile:$schema" background-color "$color"
+    echo "Tema alterado para $theme $subtheme com a cor de fundo $color"
+else
+    echo "Erro: não foi possível alterar a cor de fundo do terminal. Verifique se o perfil existe e se as permissões estão corretas."
+    exit 1
+fi
+
+# Como usar o script:
+# 1. Dê permissão de execução ao script: chmod +x theme.sh
+# 2. Execute o script passando o tema e, opcionalmente, o subtema: ./theme.sh {theme} [subtheme]
+#    Exemplo 1: ./theme.sh tokyonight
+#    Exemplo 2: ./theme.sh tokyonight storm
+#    Exemplo 3: ./theme.sh gruvbox light
+# 3. Após tornar o script universal, você pode usar: theme {theme} [subtheme]
