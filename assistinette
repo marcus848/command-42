@@ -1,0 +1,189 @@
+#!/bin/bash
+
+# Arquivo para armazenar os projetos
+PROJECTS_FILE="$HOME/.42_projects"
+
+print_colored() {
+	case $2 in
+		"greenb") echo -e "\033[1;32m$1\033[0m" ;; # Green bold
+		"redb") echo -e "\033[1;31m$1\033[0m" ;; # Red bold
+		"yellowb") echo -e "\033[1;33m$1\033[0m" ;; # Yellow bold
+		"yellow") echo -e "\033[0;33m$1\033[0m" ;; # Yellow 
+		"blueb") echo -e "\033[1;34m$1\033[0m" ;; # Blue bold
+		*) echo "$1" ;; # Sem cor
+	esac
+}
+
+loading_animation() {
+	frames="/ - \\ |"
+	while :; do
+		for frame in $frames; do
+			printf "\r%s" "$frame"  # Imprime o frame
+			sleep 0.1               # Pausa para o efeito
+		done
+	done
+}
+
+# Função para criar um novo projeto
+create_project() {
+	local project_name=$1
+	local project_path=$2
+	local use_libft=$3
+	 
+	# Verificar se o caminho do projeto foi fornecido
+	if [ -z "$project_path" ]; then
+		echo "Erro: Caminho do projeto não fornecido."
+		exit 1
+	fi
+
+	# Criar estrutura de pastas padrão
+	mkdir -p "$project_path"
+	mkdir -p "$project_path/src" "$project_path/include" "$project_path/tests" "$project_path/bin" "$project_path/apps" "$project_path/obj"
+
+	# Verificar se a criação das pastas foi bem-sucedida
+	if [ $? -ne 0 ]; then
+		echo "Erro ao criar a estrutura de pastas em $project_path."
+		exit 1
+	fi
+
+	# Se usar libft, copiar para o projeto
+	if [ "$use_libft" = "libft" ]; then
+		libft_path="$HOME/42/libft"
+		mkdir -p "$project_path/libft"
+		cp -r "$libft_path/srcs" "$project_path/libft/srcs"
+		cp -r "$libft_path/include" "$project_path/libft/include"
+		cp "$libft_path/Makefile" "$project_path/libft/Makefile"
+
+		if [ $? -ne 0 ]; then
+			echo "Erro ao copiar a libft para o projeto."
+			exit 1
+		fi
+	fi
+
+	# Salvar caminho do projeto
+	echo "$project_name=$project_path" >> "$PROJECTS_FILE"
+	print_colored "Projeto $project_name criado em $project_path." "blueb"
+}
+
+# Função para iniciar o dia de trabalho
+start_day() {
+	local project_name=$1
+	local project_path
+
+	# Buscar o caminho do projeto pelo nome
+	project_path=$(grep "^$project_name=" "$PROJECTS_FILE" | cut -d'=' -f2)
+
+	if [ -z "$project_path" ]; then
+		echo "Projeto não encontrado: $project_name"
+		exit 1
+	fi
+
+	# Abrir tmux, navegar até a pasta e iniciar nvim
+	tmux new-session -d -s assist$project_name -n main
+	tmux send-keys -t assist$project_name:main "cd $project_path" C-m
+	tmux send-keys -t assist$project_name:main "nvim" C-m
+	tmux split-window -t assist$project_name:main -h
+	tmux send-keys -t assist$project_name:main "cd $project_path" C-m
+	tmux attach-session -t assist$project_name
+}
+#
+run_norm() {
+	local details=$1
+	local temp_file=$(mktemp)
+
+	if [ "$details" = "detailed" ]; then
+		norm -D
+	else
+		norm > "$temp_file" 2>&1
+	fi
+	
+	cat "$temp_file"
+	rm -f "$temp_file"
+}
+
+run_norm_with_animation() {
+	local temp_file=$(mktemp)
+
+	if ! norm > "$temp_file" 2>&1; then
+		echo "Erro ao executar norminette."
+		exit 1
+	fi &
+	NORM_PID=$!
+	
+	loading_animation &
+	LOADING_PID=$!
+
+	wait $NORM_PID
+	NORM_EXIT_CODE=$?
+
+	kill $LOADING_PID 2>/dev/null
+	wait $LOADING_PID 2>/dev/null
+
+	if [ $NORM_EXIT_CODE -eq 0 ]; then
+		if [ -s "$temp_file" ]; then
+			printf "\r"
+			cat "$temp_file"
+		else
+			echo "SUCCESS"
+		fi
+	else
+		echo "erro"
+	fi
+
+	rm -f "$temp_file"	
+}
+
+# Função de ajuda
+show_help() {
+	echo "Uso: $0 [opções]"
+	echo
+	echo "Opções:"
+	echo "  -c <nome> <caminho> [libft]  Criar um novo projeto (use 'libft' para copiar a libft)"
+	echo "  -s <nome>                    Iniciar o dia de trabalho para o projeto especificado"
+	echo "  -n                           Executar norminette simples"
+	echo "  -N                           Executar norminette detalhada"
+	echo "  -h                           Mostrar esta ajuda"
+}
+
+# Verificar argumentos
+if [ $# -eq 0 ]; then
+	show_help
+	exit 0
+fi
+
+# Processar argumentos
+while getopts "c:s:nNh" opt; do
+	case $opt in
+		c)
+			project_name=$OPTARG
+			use_libft="$3"
+			project_path="$4"
+			create_project "$project_name" "$use_libft" "$project_path"
+			shift 3
+			;;
+		s)
+			start_day "$OPTARG"
+			shift 1
+			;;
+		n)
+			print_colored "Norminette (Simple): " "blueb"
+			printf "\r"
+			run_norm_with_animation
+			exit 0
+			;;
+		N)
+			print_colored "Norminette (Detailed):" "blueb"
+			run_norm "detailed"
+			exit 0
+			;;
+		h)
+			show_help
+			exit 0
+			;;
+		*)
+			show_help
+			exit 1
+			;;
+	esac
+done
+
