@@ -24,6 +24,123 @@ loading_animation() {
 	done
 }
 
+make_makefile() {
+    local project_path=$1
+    local use_libft=$2
+
+    cat <<EOF > "$project_path/Makefile"
+# File name
+NAME = project_name
+
+# Compiler and flags
+CC = cc
+CFLAGS = -Wall -Wextra -Werror -g -Iinclude
+
+# Directories
+SRC_DIR = src
+OBJ_DIR = obj
+EOF
+
+    # Add LIBFT_DIR if needed
+    if [ "$use_libft" = "libft" ]; then
+        cat <<EOF >> "$project_path/Makefile"
+LIBFT_DIR = libft
+EOF
+    fi
+
+    # Continue with sources and objects
+    cat <<EOF >> "$project_path/Makefile"
+
+# Source and object files
+SRCS = \$(wildcard \$(SRC_DIR)/*.c)
+OBJS = \$(SRCS:\$(SRC_DIR)/%.c=\$(OBJ_DIR)/%.o)
+EOF
+
+    # Add LIBFT if needed
+    if [ "$use_libft" = "libft" ]; then
+        cat <<EOF >> "$project_path/Makefile"
+LIBFT = \$(LIBFT_DIR)/libft.a
+EOF
+    fi
+
+    # Main target
+    cat <<EOF >> "$project_path/Makefile"
+
+# targets
+all: \$(NAME)
+
+\$(NAME): \$(OBJS) $( [ "$use_libft" = "libft" ] && echo "\$(LIBFT)" )
+	\$(CC) \$(CFLAGS) -o \$(NAME) \$(OBJS) $( [ "$use_libft" = "libft" ] && echo "-L\$(LIBFT_DIR) -lft" )
+EOF
+
+    # Add LIBFT rule if needed
+    if [ "$use_libft" = "libft" ]; then
+        cat <<EOF >> "$project_path/Makefile"
+
+\$(LIBFT):
+	\$(MAKE) -C \$(LIBFT_DIR)
+EOF
+    fi
+
+    # Add object file compilation rule
+    cat <<EOF >> "$project_path/Makefile"
+
+\$(OBJ_DIR)/%.o: \$(SRC_DIR)/%.c
+	@mkdir -p \$(@D)
+	\$(CC) \$(CFLAGS) -c \$< -o \$@
+
+clean:
+	@rm -rf \$(OBJ_DIR) $( [ "$use_libft" = "libft" ] && echo "\$(LIBFT_DIR)/obj" )
+	@echo "Object files removed."
+
+fclean: clean
+	@rm -f \$(NAME) $( [ "$use_libft" = "libft" ] && echo "\$(LIBFT)" )
+	@echo "fcleaned"
+
+re: fclean all
+
+.PHONY: all clean fclean re
+EOF
+}
+
+make_gitignore() {
+    project_path=$1
+    use_libft=$2
+    
+    # Verifica se o projeto usa libft
+    if [ "$use_libft" = "libft" ]; then
+        cat <<EOF > "$project_path/.gitignore"
+# Objs e binários
+libft/obj/
+libft/libft.a
+bin/
+obj/
+
+# Arquivos temporários
+*.o
+*.swp
+*.tmp
+
+# Logs
+*.log
+EOF
+    else
+        cat <<EOF > "$project_path/.gitignore"
+# Objs e binários
+bin/
+obj/
+
+# Arquivos temporários
+*.o
+*.swp
+*.tmp
+
+# Logs
+*.log
+EOF
+    fi
+}
+
 # Função para criar um novo projeto
 create_project() {
 	local project_name=$1
@@ -50,7 +167,7 @@ create_project() {
 	if [ "$use_libft" = "libft" ]; then
 		libft_path="$HOME/42/libft"
 		mkdir -p "$project_path/libft"
-		cp -r "$libft_path/srcs" "$project_path/libft/srcs"
+		cp -r "$libft_path/src" "$project_path/libft/src"
 		cp -r "$libft_path/include" "$project_path/libft/include"
 		cp "$libft_path/Makefile" "$project_path/libft/Makefile"
 
@@ -59,9 +176,14 @@ create_project() {
 			exit 1
 		fi
 	fi
+	
+	make_makefile "$project_path" "$use_libft"
+	make_gitignore "$project_path" "$use_libft"
 
+	cd "$project_path"
+	
 	# Salvar caminho do projeto
-	echo "$project_name=$project_path" >> "$PROJECTS_FILE"
+	echo "$project_name=$(pwd)" >> "$PROJECTS_FILE"
 	print_colored "Projeto $project_name criado em $project_path." "blueb"
 }
 
