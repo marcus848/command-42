@@ -144,7 +144,7 @@ EOF
 # Função para criar um novo projeto
 create_project() {
 	local project_name=$1
-	local project_path=$2
+	local project_path="$2/$project_name"
 	local use_libft=$3
 	 
 	# Verificar se o caminho do projeto foi fornecido
@@ -191,7 +191,9 @@ create_project() {
 start_day() {
 	local project_name=$1
 	local project_path
-
+	
+	echo "$project_name"
+	exit 1
 	# Buscar o caminho do projeto pelo nome
 	project_path=$(grep "^$project_name=" "$PROJECTS_FILE" | cut -d'=' -f2)
 
@@ -267,6 +269,105 @@ show_help() {
 	echo "  -h                           Mostrar esta ajuda"
 }
 
+update_libft() {
+	local project_name=$1
+	local libft_source="$HOME/42/libft"
+
+	local project_path=$(grep "^$project_name=" "$PROJECTS_FILE" | cut -d'=' -f2-)
+
+	if [ -z "$project_path" ]; then
+		echo "Projeto não encontrado: $project_name"
+		exit 1
+	fi
+
+	local libft_destination="$project_path/libft"
+
+	if [ ! -d "$libft_source" ]; then
+		echo "libft não existe: $libft_source"
+		exit 1
+	fi
+	
+	if [ ! -d "$libft_destination" ]; then
+		echo "Add libft ao projeto $project"
+	else
+		echo "Atualizando libft do projeto $project"
+	fi
+
+	rm -rf "$libft_destination"
+	mkdir -p "$libft_destination"
+	cp -r "$libft_source/src" "$libft_destination/src"
+	cp -r "$libft_source/include" "$libft_destination/include"
+	cp "$libft_source/Makefile" "$libft_destination/Makefile"
+
+	print_colored "Libft Atualizada adicionada" "greenb"
+}
+
+add_projects() {
+	local project_name=$1
+	local project_path=$2
+	local path_final
+
+	if grep -q "^$project_name=" "$PROJECTS_FILE"; then
+		echo "Project '$project_name' ja existe, deseja edita-lo? (S/n)"
+		read response
+	fi
+
+	if [ "$response" == "n" ]; then
+		print_colored "Acão cancelada!" "greenb"
+		exit 0
+	fi
+
+	cd "$project_path"
+	echo "$project_name=$(pwd)" >> "$PROJECTS_FILE"
+	print_colored "Projeto '$project_name' adicionado com sucesso." "greenb"
+}
+
+edit_projects() {
+	local project_name=$1
+	local new_project_path=$2
+
+	if grep -q "^$project_name=" "$PROJECTS_FILE"; then
+		cd "$new_project_path"
+		sed -i "s|^$project_name=.*|$project_name=$(pwd)|" "$PROJECTS_FILE"
+		print_colored "Projeto '$project_name' editado com sucesso." "greenb"
+		exit 0
+	fi
+	echo "Projeto '$project_name' não encontrado, deseja adiciona-lo? (S/n)"
+	read response
+	if [ "$response" == "n" ]; then
+		print_colored "Acão cancelada!" "greenb"
+		exit 0
+	fi
+	cd "$new_project_path"
+	echo "$project_name=$(pwd)" >> "$PROJECTS_FILE"
+	print_colored "Projeto '$project_name' adicionado com sucesso." "greenb"
+}
+
+del_projects() {
+	local project_name=$1
+
+	echo "Deseja excluir o $project_name? (S/n)"
+	read response
+
+	if [ "$response" == "n" ]; then
+		print_colored "Acão cancelada!" "greenb"
+		exit 0
+	fi
+	
+	if grep -q "^$project_name=" "$PROJECTS_FILE"; then
+		sed -i "/^$project_name=/d" "$PROJECTS_FILE"
+		print_colored "Projeto '$project_name' removido com sucesso." "greenb"
+	else
+		echo "Projeto '$project_name' não encontrado"
+	fi
+
+}
+
+view_projects() {
+	print_colored "Projetos listados em $PROJECTS_FILE:" "greenb"
+	cat "$PROJECTS_FILE"
+}
+
 # Verificar argumentos
 if [ $# -eq 0 ]; then
 	show_help
@@ -274,7 +375,7 @@ if [ $# -eq 0 ]; then
 fi
 
 # Processar argumentos
-while getopts "c:s:nNh" opt; do
+while getopts "c:s:nNh:u:a:e:d:v" opt; do
 	case $opt in
 		c)
 			project_name=$OPTARG
@@ -298,6 +399,28 @@ while getopts "c:s:nNh" opt; do
 			run_norm "detailed"
 			exit 0
 			;;
+		u)
+			update_libft "$OPTARG"
+			shift 1
+			;;
+		a)
+			add_projects "$OPTARG" "${!OPTIND}"
+			shift 2
+			;;
+		e)
+			project_name="$OPTARG"
+			new_project_path="${!OPTIND}"
+			edit_projects "$project_name" "$new_project_path"
+			shift 2
+			;;
+		d)
+			del_projects "$OPTARG"
+			shift 1
+			;;
+		v)
+			view_projects
+			exit 0
+			;;
 		h)
 			show_help
 			exit 0
@@ -308,4 +431,3 @@ while getopts "c:s:nNh" opt; do
 			;;
 	esac
 done
-
