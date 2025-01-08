@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Arquivo para armazenar os projetos
-PROJECTS_FILE="$HOME/.42_projects"
+MAIN_DIR="$HOME/assistinette"
+PROJECTS_FILE="$MAIN_DIR/42_projects"
 
 print_colored() {
 	case $2 in
@@ -34,120 +35,25 @@ get_project_path() {
 }
 
 make_makefile() {
-    local project_path=$1
-    local use_libft=$2
+	local project_path=$1
+	local use_libft=$2
 
-    cat <<EOF > "$project_path/Makefile"
-# File name
-NAME = project_name
-
-# Compiler and flags
-CC = cc
-CFLAGS = -Wall -Wextra -Werror -g -Iinclude
-
-# Directories
-SRC_DIR = src
-OBJ_DIR = obj
-EOF
-
-    # Add LIBFT_DIR if needed
-    if [ "$use_libft" = "libft" ]; then
-        cat <<EOF >> "$project_path/Makefile"
-LIBFT_DIR = libft
-EOF
-    fi
-
-    # Continue with sources and objects
-    cat <<EOF >> "$project_path/Makefile"
-
-# Source and object files
-SRCS = \$(wildcard \$(SRC_DIR)/*.c)
-OBJS = \$(SRCS:\$(SRC_DIR)/%.c=\$(OBJ_DIR)/%.o)
-EOF
-
-    # Add LIBFT if needed
-    if [ "$use_libft" = "libft" ]; then
-        cat <<EOF >> "$project_path/Makefile"
-LIBFT = \$(LIBFT_DIR)/libft.a
-EOF
-    fi
-
-    # Main target
-    cat <<EOF >> "$project_path/Makefile"
-
-# targets
-all: \$(NAME)
-
-\$(NAME): \$(OBJS) $( [ "$use_libft" = "libft" ] && echo "\$(LIBFT)" )
-	\$(CC) \$(CFLAGS) -o \$(NAME) \$(OBJS) $( [ "$use_libft" = "libft" ] && echo "-L\$(LIBFT_DIR) -lft" )
-EOF
-
-    # Add LIBFT rule if needed
-    if [ "$use_libft" = "libft" ]; then
-        cat <<EOF >> "$project_path/Makefile"
-
-\$(LIBFT):
-	\$(MAKE) -C \$(LIBFT_DIR)
-EOF
-    fi
-
-    # Add object file compilation rule
-    cat <<EOF >> "$project_path/Makefile"
-
-\$(OBJ_DIR)/%.o: \$(SRC_DIR)/%.c
-	@mkdir -p \$(@D)
-	\$(CC) \$(CFLAGS) -c \$< -o \$@
-
-clean:
-	@rm -rf \$(OBJ_DIR) $( [ "$use_libft" = "libft" ] && echo "\$(LIBFT_DIR)/obj" )
-	@echo "Object files removed."
-
-fclean: clean
-	@rm -f \$(NAME) $( [ "$use_libft" = "libft" ] && echo "\$(LIBFT)" )
-	@echo "fcleaned"
-
-re: fclean all
-
-.PHONY: all clean fclean re
-EOF
+	if [ "$use_libft" = "libft" ]; then
+		cp "$MAIN_DIR/Makefile-libft" "$project_path/Makefile"
+	else
+		cp "$MAIN_DIR/Makefile" "$project_path/Makefile"
+	fi
 }
 
 make_gitignore() {
-    project_path=$1
-    use_libft=$2
-    
-    # Verifica se o projeto usa libft
-    if [ "$use_libft" = "libft" ]; then
-        cat <<EOF > "$project_path/.gitignore"
-# Objs e binários
-libft/obj/
-libft/libft.a
-bin/
-obj/
+	project_path=$1
+	use_libft=$2
 
-# Arquivos temporários
-*.o
-*.swp
-*.tmp
-
-# Logs
-*.log
-EOF
-    else
-        cat <<EOF > "$project_path/.gitignore"
-# Objs e binários
-bin/
-obj/
-
-# Arquivos temporários
-*.o
-*.swp
-*.tmp
-
-# Logs
-*.log
-EOF
-    fi
+	if [ "$use_libft" = "libft" ]; then
+		cp "$MAIN_DIR/gitignore-libft" "$project_path/.gitignore"
+	else
+		cp "$MAIN_DIR/gitignore" "$project_path/.gitignore"
+	fi
 }
 
 # Função para criar um novo projeto
@@ -264,18 +170,6 @@ run_norm_with_animation() {
 	rm -f "$temp_file"	
 }
 
-# Função de ajuda
-show_help() {
-	echo "Uso: $0 [opções]"
-	echo
-	echo "Opções:"
-	echo "  -c <nome> <caminho> [libft]  Criar um novo projeto (use 'libft' para copiar a libft)"
-	echo "  -s <nome>                    Iniciar o dia de trabalho para o projeto especificado"
-	echo "  -n                           Executar norminette simples"
-	echo "  -N                           Executar norminette detalhada"
-	echo "  -h                           Mostrar esta ajuda"
-}
-
 update_libft() {
 	local project_name=$1
 	local libft_source="$HOME/42/libft"
@@ -377,12 +271,33 @@ view_projects() {
 
 go_project_path() {
 	local project_name=$1
-	# local project_path
-	
-	echo "$project_name"
+	local project_path
+
 	project_path=$(get_project_path $project_name)
-	echo "$project_path"
-	cd "$project_path"
+
+	if [ -z $project_path ]; then
+		echo "$HOME"
+	else
+		echo "$project_path"
+	fi
+}
+
+# Função de ajuda
+show_help() {
+    echo "Usage: $0 [options]"
+    echo
+    echo "Options:"
+    echo "  -c <name> <path> [libft]     Create a new project (use 'libft' to copy libft)"
+    echo "  -s <name>                    Start the workday for the specified project"
+    echo "  -n                           Run a simple norminette check"
+    echo "  -N                           Run a detailed norminette check"
+    echo "  -h                           Show this help message"
+    echo "  -u <name>                    Update the libft for the specified project"
+    echo "  -a <name> <path>             Add a new project"
+    echo "  -e <name> <new_path>         Edit the path for an existing project"
+    echo "  -d <name>                    Delete a project"
+    echo "  -v                           View all projects"
+    echo -e "  -g <name>                    \033[3;33mGet the path to the project (use as: cd \$(assistinette -g project_name))\033[0m"
 }
 
 # Verificar argumentos
@@ -392,7 +307,7 @@ if [ $# -eq 0 ]; then
 fi
 
 # Processar argumentos
-while getopts "c:s:nNh:u:a:e:d:v:g" opt; do
+while getopts "c:s:nNh:u:a:e:d:vg" opt; do
 	case $opt in
 		c)
 			project_name=$OPTARG
