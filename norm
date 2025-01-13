@@ -21,12 +21,17 @@ print_colored() {
 SHOW_ALL=false
 if [[ "$1" == "-D" ]]; then
     SHOW_ALL=true
+    shift
 fi
 
+DIR="."
+if [[ ! -z "$1" ]]; then
+	DIR="$1"
+fi
 FOUND_ERROR=false
 
 # Rodar norminette e filtrar arquivos com ou sem erro
-for file in $(find . -type f \( -name "*.c" -o -name "*.h" \)); do
+for file in $(find "$DIR" -type f \( -name "*.c" -o -name "*.h" \)); do
     output=$(norminette "$file")
     
     if echo "$output" | grep -q "Error"; then
