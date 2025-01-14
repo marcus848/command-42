@@ -126,12 +126,18 @@ start_day() {
 #
 run_norm() {
 	local details=$1
+	shift 2
 	local temp_file=$(mktemp)
+	local items
 
+	if [ $# -gt 0 ]; then
+		items="$@"
+	fi
+	# exit 1
 	if [ "$details" = "detailed" ]; then
-		norm -D
+		norm -D $items
 	else
-		norm > "$temp_file" 2>&1
+		norm $items > "$temp_file" 2>&1
 	fi
 	
 	cat "$temp_file"
@@ -140,11 +146,8 @@ run_norm() {
 
 run_norm_with_animation() {
 	local temp_file=$(mktemp)
-
-	if ! norm > "$temp_file" 2>&1; then
-		echo "Erro ao executar norminette."
-		exit 1
-	fi &
+	
+	norm "$@" > "$temp_file" 2>&1 &
 	NORM_PID=$!
 	
 	loading_animation &
@@ -156,15 +159,20 @@ run_norm_with_animation() {
 	kill $LOADING_PID 2>/dev/null
 	wait $LOADING_PID 2>/dev/null
 
-	if [ $NORM_EXIT_CODE -eq 0 ]; then
+	printf "\r"
+
+	if [ $NORM_EXIT_CODE -ne 0 ]; then
 		if [ -s "$temp_file" ]; then
-			printf "\r"
+			cat "$temp_file"
+		else
+			echo "Erro ao executar norm com os argumentos $@"
+		fi
+	else
+		if [ -s "$temp_file" ]; then
 			cat "$temp_file"
 		else
 			echo "SUCCESS"
 		fi
-	else
-		echo "erro"
 	fi
 
 	rm -f "$temp_file"	
@@ -323,12 +331,13 @@ while getopts "c:s:nNh:u:a:e:d:vg" opt; do
 		n)
 			print_colored "Norminette (Simple): " "blueb"
 			printf "\r"
-			run_norm_with_animation
+			shift
+			run_norm_with_animation $@
 			exit 0
 			;;
 		N)
 			print_colored "Norminette (Detailed):" "blueb"
-			run_norm "detailed"
+			run_norm "detailed" $@
 			exit 0
 			;;
 		u)
