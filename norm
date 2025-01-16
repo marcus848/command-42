@@ -40,14 +40,17 @@ run_norm() {
 		if $SHOW_ALL; then
 		    print_colored "KO: $file" "yellowb"
 		    print_colored "$output" "yellow"
+		    echo ""
 		else
 		    print_colored "KO: $file" "yellowb"
 		    print_colored "$output" "yellow"
+		    echo ""
 		fi
 	    else
 		# Arquivo sem erro (OK)
 		if $SHOW_ALL; then
 		    print_colored "OK: $file" "greenb"
+		    echo ""
 		fi
 	    fi
 	done
