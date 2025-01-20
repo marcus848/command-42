@@ -58,6 +58,7 @@ run_norm() {
 	if ! $FOUND_ERROR && ! $SHOW_ALL; then
 		print_colored ">>>>> SUCCESS <<<<<" "greenb"
 	fi
+	FOUND_ERROR=false
 }
 
 run_norm_file() {
