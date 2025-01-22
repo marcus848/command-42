@@ -183,7 +183,7 @@ update_libft() {
 	local libft_source="$HOME/42/libft"
 
 	local project_path=$(get_project_path $project_name)
-
+	
 	if [ -z "$project_path" ]; then
 		echo "Projeto não encontrado: $project_name"
 		exit 1
@@ -315,58 +315,65 @@ if [ $# -eq 0 ]; then
 fi
 
 # Processar argumentos
-while getopts "c:s:nNh:u:a:e:d:vg" opt; do
-	case $opt in
-		c)
-			project_name=$OPTARG
-			use_libft="$3"
-			project_path="$4"
-			create_project "$project_name" "$use_libft" "$project_path"
-			shift 3
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-c)
+			shift 1
+			create_project "$1" "$2" "$3"
+			if [ "$3" == "libft" ]; then
+				shift 3
+			else
+				shift 2
+			fi
+			exit 1
 			;;
-		s)
-			start_day "$OPTARG"
+		-s)
+			shift 1
+			start_day "$1"
 			shift 1
 			;;
-		n)
+		-n)
 			print_colored "Norminette (Simple): " "blueb"
 			printf "\r"
 			shift
 			run_norm_with_animation $@
 			exit 0
 			;;
-		N)
+		-N)
 			print_colored "Norminette (Detailed):" "blueb"
 			run_norm "detailed" $@
 			exit 0
 			;;
-		u)
-			update_libft "$OPTARG"
+		-u)
+			shift 1
+			update_libft "$1"
 			shift 1
 			;;
-		a)
-			add_projects "$OPTARG" "${!OPTIND}"
+		-a)
+			shift 1
+			add_projects "$1" "$2"
 			shift 2
 			;;
-		e)
-			project_name="$OPTARG"
-			new_project_path="${!OPTIND}"
-			edit_projects "$project_name" "$new_project_path"
+		-e)
+			shift 1
+			edit_projects "$1" "$2"
 			shift 2
 			;;
-		d)
-			del_projects "$OPTARG"
+		-d)
+			shift 1
+			del_projects "$1"
 			shift 1
 			;;
-		v)
+		-v)
+			shift 1
 			view_projects
 			exit 0
 			;;
-		g)
+		-g)
 			go_project_path "$2"
-			exit 0
+			shift 1
 			;;
-		h)
+		-h)
 			show_help
 			exit 0
 			;;
