@@ -328,10 +328,12 @@ show_help() {
 
 verify_tag_notes() {
 	local tag=$1
-
-	if [ $tag = "important" ]; then
+	local valid_tags=("#important" "#idea" "#question" "#note")
+	if [[ ! " ${valid_tags[@]} " =~ " ${tag} " ]]; then
+		print_colored "Invalid tag. Use #important, #idea, #question or #note." "redb"
 		return 1
 	fi
+	return 0
 }
 
 print_header_notes_tag()
@@ -355,7 +357,7 @@ print_header_notes_tag()
 	esac
 }
 
-view_all_notes_by_tag()
+view_notes_by_tag()
 {
 	local project_name=$1
 	local tag=$2
@@ -363,13 +365,29 @@ view_all_notes_by_tag()
 	local notes_dir="$MAIN_DIR/notes/$project_name"
 
 	for file in "$notes_dir"/*; do
-		file_tag=$(head -n -1 "$file")
+		file_tag=$(head -n 1 "$file")
 		if [ $tag = $file_tag ]; then
 			print_header_notes_tag $tag
 			tail -n +2 "$file"
 			echo 
 		fi
 	done
+}
+
+delete_notes_by_tag()
+{
+	local project_name=$1
+	local tag=$2
+	local file_tag
+	local notes_dir="$MAIN_DIR/notes/$project_name"
+
+	for file in "$notes_dir"/*; do
+		file_tag=$(head -n 1 "$file")
+		if [ $tag = $file_tag ]; then
+			rm $file
+		fi
+	done
+	print_colored "Notes '$tag' removed from '$project_name'." "greenb"
 }
 
 menage_notes() {
@@ -399,14 +417,15 @@ menage_notes() {
 	case $action in
 		"add")
 			if [[ "$tag" =~ ^# ]]; then
-				shift 2
-				tag=$1
-				shift 1
+				shift 3
 				note_content="$@"
 			else
 				tag="#note"
 				shift 2
 				note_content="$@"
+			fi
+			if ! verify_tag_notes "$tag"; then
+				exit 1
 			fi
 			if [ -f "$note_file" ];then
 				echo "NOTE $note_name already exist in $project_name"
@@ -419,7 +438,7 @@ menage_notes() {
 					echo "$note_content" >> "$note_file"
 					print_colored "$note_name updated" "greenb"
 					exit 1
-				elif [ "$response" = "C" ]; then
+				elif [ "$response" = "C" -o -z "$response" ]; then
 					print_colored "Action canceled" "greenb"
 					exit 1
 				fi
@@ -445,7 +464,7 @@ menage_notes() {
 					tail -n +2 "$note_file"
 					echo
 				elif [[ $file =~ ^# ]]; then
-					view_all_notes_by_tag $project_name $file
+					view_notes_by_tag $project_name $file
 				else
 					print_colored "Note '$note_name' not found in project '$project_name'." "redb"
 				fi
@@ -469,6 +488,8 @@ menage_notes() {
 					if [ -f "$note_file" ]; then
 						rm "$note_file"
 						print_colored "Note '$note_name' removed from '$project_name'." "greenb"
+					elif [[ $file =~ ^# ]]; then
+						delete_notes_by_tag $project_name $file
 					else
 						print_colored "Note '$note_name' not found from '$project_name'." "redb"
 					fi
