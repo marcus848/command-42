@@ -34,6 +34,24 @@ get_project_path() {
 	echo $project_path
 }
 
+get_project_name() {
+	local project_name
+	
+	project_name=$(grep "=$(pwd)$" "$PROJECTS_FILE" | cut -d '=' -f 1)
+
+	echo $project_name
+}
+
+check_file_exist() {
+	local project="$1"
+	
+	if grep -q "^$project=" "$PROJECTS_FILE"; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+
 make_makefile() {
 	local project_path=$1
 	local use_libft=$2
@@ -308,6 +326,194 @@ show_help() {
     echo -e "  -g <name>                    \033[3;33mGet the path to the project (use as: cd \$(assistinette -g project_name))\033[0m"
 }
 
+verify_tag_notes() {
+	local tag=$1
+
+	if [ $tag = "important" ]; then
+		return 1
+	fi
+}
+
+print_header_notes_tag()
+{
+	case $1 in
+		"#important")
+			print_colored "=== IMPORTANT ===" "redb"
+			;; 
+		"#idea")
+			print_colored "=== IDEA ===" "greenb"
+			;; 
+		"#question")
+			print_colored "=== QUESTION ===" "yellowb"
+			;; 
+		"#note")
+			print_colored "=== NOTE ===" "blueb"
+			;; 
+		*)
+			print_colored "=== NOTE ===" "blueb"
+			;; 
+	esac
+}
+
+view_all_notes_by_tag()
+{
+	local project_name=$1
+	local tag=$2
+	local file_tag
+	local notes_dir="$MAIN_DIR/notes/$project_name"
+
+	for file in "$notes_dir"/*; do
+		file_tag=$(head -n -1 "$file")
+		if [ $tag = $file_tag ]; then
+			print_header_notes_tag $tag
+			tail -n +2 "$file"
+			echo 
+		fi
+	done
+}
+
+menage_notes() {
+	local action=$1
+	local project_name=$2
+	local note_name=$3
+	local tag=$4
+	local note_content
+	local check_file=1
+
+	check_file=$(check_file_exist "$project_name")
+	if [ $check_file = 0 ]; then
+		project_name=$(get_project_name)
+		if [ $(check_file_exist "$project_name") = 0 ]; then
+			print_colored "Project not found" "redb"
+			exit 0
+		fi
+		note_name=$2
+		tag=$3
+	fi
+
+	local notes_dir="$MAIN_DIR/notes/$project_name"
+	local note_file="$notes_dir/$note_name"
+	
+	mkdir -p "$notes_dir"
+
+	case $action in
+		"add")
+			if [[ "$tag" =~ ^# ]]; then
+				shift 2
+				tag=$1
+				shift 1
+				note_content="$@"
+			else
+				tag="#note"
+				shift 2
+				note_content="$@"
+			fi
+			if [ -f "$note_file" ];then
+				echo "NOTE $note_name already exist in $project_name"
+				echo "What you want to do?"
+				echo "S -- Substitude"
+				echo "A -- Add in note (below)"
+				echo "C -- Cancel"
+				read response
+				if [ "$response" = "A" ]; then
+					echo "$note_content" >> "$note_file"
+					print_colored "$note_name updated" "greenb"
+					exit 1
+				elif [ "$response" = "C" ]; then
+					print_colored "Action canceled" "greenb"
+					exit 1
+				fi
+			fi
+
+			echo "$tag" > "$note_file"
+			if [ -n "$note_content" ]; then
+				echo "$note_content" >> "$note_file"
+			else
+				echo "" >> "$note_file"
+				${EDITOR:-vi} "$note_file"
+			fi
+			print_colored "Note '$note_name' add in the project '$project_name'." "greenb"
+			;;
+		"view")
+			shift 1
+			for file in $@; do
+				note_name=$file
+				note_file="$notes_dir/$note_name"
+				if [ -f "$note_file" ]; then
+					tag=$(head -n 1 "$note_file")
+					print_header_notes_tag $tag
+					tail -n +2 "$note_file"
+					echo
+				elif [[ $file =~ ^# ]]; then
+					view_all_notes_by_tag $project_name $file
+				else
+					print_colored "Note '$note_name' not found in project '$project_name'." "redb"
+				fi
+			done
+			;;
+		"edit")
+			if [ -f "$note_file" ]; then
+				${EDITOR:-vi} "$note_file"
+			else
+				print_colored "Note '$note_name' not found from '$project_name'." "redb"
+			fi
+			;;
+		"delete")
+			shift 1
+			if [ "$1" = "--all" ]; then
+				rm "$notes_dir"/*
+			else
+				for file in $@; do
+					note_name=$file
+					note_file="$notes_dir/$note_name"
+					if [ -f "$note_file" ]; then
+						rm "$note_file"
+						print_colored "Note '$note_name' removed from '$project_name'." "greenb"
+					else
+						print_colored "Note '$note_name' not found from '$project_name'." "redb"
+					fi
+				done
+			fi
+			;;
+		"list")
+			if [ -d "$notes_dir" ]; then
+				local count_notes=$(ls "$notes_dir" | wc -l)
+				if [ "$count_notes" != "0" ]; then
+					for note in $(ls "$notes_dir"); do
+						local note_path="$notes_dir/$note"
+						local tag=$(head -n 1 "$note_path")
+						local mod_date=$(stat -c "%y" "$note_path" | cut -d'.' -f1)
+						case $tag in
+							"#important")
+								print_colored "[$mod_date] $note (IMPORTANT)" "redb"
+								;;
+							"#idea")
+								print_colored "[$mod_date] $note (IDEA)" "greenb"
+								;;
+							"#question")
+								print_colored "[$mod_date] $note (QUESTION)" "yellowb"
+								;;
+							"#note")
+								print_colored "[$mod_date] $note (NOTE)" "blueb"
+								;;
+							*)
+								print_colored "[$mod_date] $note (NOTE)" "blueb"
+								;;
+						esac
+					done
+					# ls "$notes_dir"
+
+				else
+					print_colored "Notes not found for the project '$project_name'." "yellowb"
+				fi
+			fi
+			;;
+		*)
+			print_colored "Invalid action. Use add, view, edit, delete ou list." "redb"
+		
+	esac
+}
+
 # Verificar argumentos
 if [ $# -eq 0 ]; then
 	show_help
@@ -370,11 +576,17 @@ while [[ $# -gt 0 ]]; do
 			exit 0
 			;;
 		-g)
-			go_project_path "$2"
+			shift 1
+			go_project_path "$1"
 			shift 1
 			;;
 		-h)
 			show_help
+			exit 0
+			;;
+		--notes)
+			shift 1
+			menage_notes "$@"
 			exit 0
 			;;
 		*)
