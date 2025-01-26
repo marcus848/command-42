@@ -308,24 +308,6 @@ go_project_path() {
 	fi
 }
 
-# Função de ajuda
-show_help() {
-    echo "Usage: $0 [options]"
-    echo
-    echo "Options:"
-    echo "  -c <name> <path> [libft]     Create a new project (use 'libft' to copy libft)"
-    echo "  -s <name>                    Start the workday for the specified project"
-    echo "  -n [files/dirs]              Run a simple norminette check"
-    echo "  -N [files/dirs]              Run a detailed norminette check"
-    echo "  -h                           Show this help message"
-    echo "  -u <name>                    Update the libft for the specified project"
-    echo "  -a <name> <path>             Add a new project"
-    echo "  -e <name> <new_path>         Edit the path for an existing project"
-    echo "  -d <name>                    Delete a project"
-    echo "  -v                           View all projects"
-    echo -e "  -g <name>                    \033[3;33mGet the path to the project (use as: cd \$(assistinette -g project_name))\033[0m"
-}
-
 verify_tag_notes() {
 	local tag=$1
 	local valid_tags=("#important" "#idea" "#question" "#note")
@@ -415,6 +397,10 @@ menage_notes() {
 	local tag=$4
 	local note_content
 
+	if [ "$action" = "help" ]; then
+		show_help_notes
+		return 0
+	fi
 	if ! check_file_exist "$project_name"; then
 		project_name=$(get_project_name)
 		if ! check_file_exist "$project_name"; then
@@ -515,27 +501,37 @@ menage_notes() {
 			;;
 		"delete")
 			shift 1
-			if [ "$1" = "--all" ]; then
-				if [ -z "$(ls -A $notes_dir)" ] ; then
-					print_colored "Project $project_name haven't notes" "yellowb"
-				else
-					rm "$notes_dir"/*
-					print_colored "All notes deleted for project '$project_name'" "greenb"
-				fi
-			else
-				for file in $@; do
-					note_name=$file
-					note_file="$notes_dir/$note_name"
-					if [ -f "$note_file" ]; then
-						rm "$note_file"
-						print_colored "Note '$note_name' removed from '$project_name'." "greenb"
-					elif [[ $file =~ ^# ]]; then
-						delete_notes_by_tag $project_name $file
+			echo "Are you sure that you want to continue? (S/n)"
+			read -r response
+			case $response in
+			[Ss])
+
+				if [ "$1" = "--all" ]; then
+					if [ -z "$(ls -A $notes_dir)" ] ; then
+						print_colored "Project $project_name haven't notes" "yellowb"
 					else
-						print_colored "Note '$note_name' not found from '$project_name'." "redb"
+						rm "$notes_dir"/*
+						print_colored "All notes deleted for project '$project_name'" "greenb"
 					fi
-				done
-			fi
+				else
+					for file in $@; do
+						note_name=$file
+						note_file="$notes_dir/$note_name"
+						if [ -f "$note_file" ]; then
+							rm "$note_file"
+							print_colored "Note '$note_name' removed from '$project_name'." "greenb"
+						elif [[ $file =~ ^# ]]; then
+							delete_notes_by_tag $project_name $file
+						else
+							print_colored "Note '$note_name' not found from '$project_name'." "redb"
+						fi
+					done
+				fi
+				;;
+			[Nn]|*)
+				print_colored "Action canceled" "greenb"
+				;;
+			esac
 			;;
 		"list")
 			if [ -d "$notes_dir" ]; then
@@ -572,8 +568,69 @@ menage_notes() {
 			;;
 		*)
 			print_colored "Invalid action. Use add, view, edit, delete ou list." "redb"
-		
 	esac
+}
+
+show_help_notes() {
+    echo -e "\033[1;37mUsage: \033[1;32massistinette --notes [action] [project_name] [note_name] [tag] [content]\033[0m"
+    echo
+    echo -e "\033[1;37mActions:\033[0m"
+    echo -e "  \033[1;32madd\033[0m <project_name> <note_name> [tag] [content]   Add a new note to the project"
+    echo -e "                                                   (tag: \033[1;31m#important\033[0m, \033[1;32m#idea\033[0m, \033[1;33m#question\033[0m, \033[1;34m#note\033[0m)"
+    echo -e "  \033[1;32mview\033[0m <project_name> <note_name/tag>              View a specific note or all notes with a tag"
+    echo -e "  \033[1;32medit\033[0m <project_name> <note_name>                  Edit a specific note"
+    echo -e "  \033[1;32mdelete\033[0m <project_name> <note_name/tag>            Delete a specific note or all notes with a tag"
+    echo -e "  \033[1;32mlist\033[0m <project_name>                              List all notes in a project"
+    echo -e "  \033[1;32mhelp\033[0m                                             Show this help message"
+    echo
+    echo -e "\033[1;37mExamples:\033[0m"
+    echo -e "  \033[1;32massistinette --notes add my_project my_note \033[1;31m\\#important\033[0m \"This is an important note\""
+    echo -e "  \033[1;32massistinette --notes view my_project my_note\033[0m"
+    echo -e "  \033[1;32massistinette --notes view my_project \033[1;31m\\#important\033[0m"
+    echo -e "  \033[1;32massistinette --notes edit my_project my_note\033[0m"
+    echo -e "  \033[1;32massistinette --notes delete my_project my_note\033[0m"
+    echo -e "  \033[1;32massistinette --notes delete my_project \033[1;31m\\#important\033[0m"
+    echo -e "  \033[1;32massistinette --notes list my_project\033[0m"
+    echo -e "  \033[1;32massistinette --notes help\033[0m"
+    echo
+    echo -e "\033[1;37mNotes:\033[0m"
+    echo -e "  \033[1;33m- If you are inside the project directory, you can omit the <project_name>.\033[0m"
+    echo -e "  - If no tag is provided when adding a note, \033[1;34m#note\033[0m is used as the default."
+    echo -e "  - Use tags to categorize notes:"
+    echo -e "      \033[1;31m#important\033[0m  (red)"
+    echo -e "      \033[1;32m#idea\033[0m       (green)"
+    echo -e "      \033[1;33m#question\033[0m   (yellow)"
+    echo -e "      \033[1;34m#note\033[0m       (blue)"
+    echo -e "  - To delete all notes in a project, use: \033[1;32massistinette --notes delete <project_name> --all\033[0m"
+    echo -e "  - For \033[1;32mview\033[0m and \033[1;32mdelete\033[0m, you can pass multiple items (notes and tags) in any order."
+    echo -e "    Example:"
+    echo -e "      \033[1;32massistinette --notes view my_project my_note1 \033[1;31m\\#important\033[0m my_note2\033[0m"
+    echo -e "      \033[1;32massistinette --notes delete my_project my_note1 \033[1;31m\\#important\033[0m my_note2\033[0m"
+    echo -e "  - If no content is provided when adding a note, the default editor (\033[1;34mvi\033[0m) will open to allow you to write the note."
+    echo -e "  - The \033[1;32medit\033[0m action also opens the default editor (\033[1;34mvi\033[0m) to modify the note."
+    echo -e "  - Tags starting with \033[1;31m#\033[0m must be escaped with a backslash (\\) or enclosed in quotes."
+    echo -e "    Example:"
+    echo -e "      \033[1;32massistinette --notes add my_project my_note \033[1;31m\\#important\033[0m \"This is an important note\""
+    echo -e "      \033[1;32massistinette --notes add my_project my_note \033[1;31m\"#important\"\033[0m \"This is an important note\""
+}
+
+# Função de ajuda
+show_help() {
+    echo "Usage: $0 [options]"
+    echo
+    echo "Options:"
+    echo "  -c <name> <path> [libft]     Create a new project (use 'libft' to copy libft)"
+    echo "  -s <name>                    Start the workday for the specified project"
+    echo "  -n [files/dirs]              Run a simple norminette check"
+    echo "  -N [files/dirs]              Run a detailed norminette check"
+    echo "  -h                           Show this help message"
+    echo "  -u <name>                    Update the libft for the specified project"
+    echo "  -a <name> <path>             Add a new project"
+    echo "  -e <name> <new_path>         Edit the path for an existing project"
+    echo "  -d <name>                    Delete a project"
+    echo "  -v                           View all projects"
+    echo -e "  -g <name>                    \033[3;33mGet the path to the project (use as: cd \$(assistinette -g project_name))\033[0m"
+    echo "  --notes                      Manage notes for projects (use '--notes help' for more details)"
 }
 
 # Verificar argumentos
