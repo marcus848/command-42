@@ -3,6 +3,7 @@
 # Arquivo para armazenar os projetos
 MAIN_DIR="$HOME/assistinette"
 PROJECTS_FILE="$MAIN_DIR/42_projects"
+TASKS_DIR="$MAIN_DIR/tasks"
 
 print_colored() {
 	case $2 in
@@ -42,7 +43,7 @@ get_project_name() {
 	echo $project_name
 }
 
-check_file_exist() {
+check_project_exist() {
 	local project="$1"
 	
 	if grep -q "^$project=" "$PROJECTS_FILE"; then
@@ -393,7 +394,7 @@ delete_notes_by_tag()
 menage_notes() {
 	local action=$1
 	local project_name=$2
-	local note_name=$3
+	local note_name="$3"
 	local tag=$4
 	local note_content
 
@@ -401,25 +402,25 @@ menage_notes() {
 		show_help_notes
 		return 0
 	fi
-	if ! check_file_exist "$project_name"; then
+	if ! check_project_exist "$project_name"; then
 		project_name=$(get_project_name)
-		if ! check_file_exist "$project_name"; then
+		if ! check_project_exist "$project_name"; then
 			print_colored "Project not found" "redb"
 			exit 0
 		fi
-		note_name=$2
+		note_name="$2"
 		tag=$3
 	fi
 
 
 	local notes_dir="$MAIN_DIR/notes/$project_name"
-	local note_file="$notes_dir/$note_name"
-	
+	local note_file="$notes_dir/$(sanitize_name "$note_name")"
+	# exit 1	
 	mkdir -p "$notes_dir"
 
 	case $action in
 		"add")
-			if [ -z $note_name ]; then
+			if [ -z "$note_name" ]; then
 				print_colored "Note name dont received" "redb"
 				exit 1
 			fi
@@ -435,7 +436,7 @@ menage_notes() {
 				exit 1
 			fi
 			if [ -f "$note_file" ];then
-				echo "NOTE $note_name already exist in $project_name"
+				echo "NOTE '$note_name' already exist in $project_name"
 				echo "What you want to do?"
 				echo "S -- Substitude"
 				echo "A -- Add in note (below)"
@@ -474,6 +475,7 @@ menage_notes() {
 		"view")
 			shift 1
 			for file in $@; do
+				file="$(sanitize_name "$file")"
 				note_name=$file
 				note_file="$notes_dir/$note_name"
 				if [ -z "$(ls -A $notes_dir)" ]; then
@@ -501,7 +503,7 @@ menage_notes() {
 			;;
 		"delete")
 			shift 1
-			echo "Are you sure that you want to continue? (S/n)"
+			echo "Are you sure you want to continue? (S/n)"
 			read -r response
 			case $response in
 			[Ss])
@@ -514,7 +516,8 @@ menage_notes() {
 						print_colored "All notes deleted for project '$project_name'" "greenb"
 					fi
 				else
-					for file in $@; do
+					for file in "$@"; do
+						file="$(sanitize_name "$file")"
 						note_name=$file
 						note_file="$notes_dir/$note_name"
 						if [ -f "$note_file" ]; then
@@ -533,7 +536,7 @@ menage_notes() {
 				;;
 			esac
 			;;
-		"list")
+		"ls")
 			if [ -d "$notes_dir" ]; then
 				local count_notes=$(ls "$notes_dir" | wc -l)
 				if [ "$count_notes" != "0" ]; then
@@ -580,7 +583,7 @@ show_help_notes() {
     echo -e "  \033[1;32mview\033[0m <project_name> <note_name/tag>              View a specific note or all notes with a tag"
     echo -e "  \033[1;32medit\033[0m <project_name> <note_name>                  Edit a specific note"
     echo -e "  \033[1;32mdelete\033[0m <project_name> <note_name/tag>            Delete a specific note or all notes with a tag"
-    echo -e "  \033[1;32mlist\033[0m <project_name>                              List all notes in a project"
+    echo -e "  \033[1;32mls\033[0m <project_name>                                List all notes in a project"
     echo -e "  \033[1;32mhelp\033[0m                                             Show this help message"
     echo
     echo -e "\033[1;37mExamples:\033[0m"
@@ -590,7 +593,7 @@ show_help_notes() {
     echo -e "  \033[1;32massistinette --notes edit my_project my_note\033[0m"
     echo -e "  \033[1;32massistinette --notes delete my_project my_note\033[0m"
     echo -e "  \033[1;32massistinette --notes delete my_project \033[1;31m\\#important\033[0m"
-    echo -e "  \033[1;32massistinette --notes list my_project\033[0m"
+    echo -e "  \033[1;32massistinette --notes ls my_project\033[0m"
     echo -e "  \033[1;32massistinette --notes help\033[0m"
     echo
     echo -e "\033[1;37mNotes:\033[0m"
@@ -612,6 +615,281 @@ show_help_notes() {
     echo -e "    Example:"
     echo -e "      \033[1;32massistinette --notes add my_project my_note \033[1;31m\\#important\033[0m \"This is an important note\""
     echo -e "      \033[1;32massistinette --notes add my_project my_note \033[1;31m\"#important\"\033[0m \"This is an important note\""
+}
+
+sanitize_name() {
+	local task_name=$1
+
+	echo "$task_name" | tr ' ' '_' | tr -cd '[:alnum:]._-'
+}
+
+verify_project_name() {
+	local project_name=$1
+
+	if [ -z "$project_name" ] || ! check_project_exist "$project_name"; then
+		project_name=$(get_project_name)
+		if ! check_project_exist "$project_name"; then
+			print_colored "Project not found" "redb"
+			exit 0
+		fi
+	else
+		shift 1
+	fi
+
+	echo "$project_name"
+}
+
+get_task_status() {
+    local project_name=$1
+    local status_type=$2
+    local task_dir="$TASKS_DIR/$project_name"
+    local task_config="$task_dir/.config"
+    
+    # Verifica se o arquivo de configuração existe
+    if [[ ! -f "$task_config" ]]; then
+        echo "Config file not found for project $project_name"
+        return 1
+    fi
+
+    # Obtém o valor correspondente ao tipo de status
+    local result=$(grep "$status_type:" "$task_config" | cut -d ':' -f 2)
+    
+    # Remove espaços em branco ao redor do resultado
+    result=$(echo "$result" | xargs)
+    
+    echo "$result"
+}
+
+atualize_task_status() {
+    local project_name=$1
+    local status_type=$2
+    local sum=$3
+    local task_dir="$TASKS_DIR/$project_name"
+    local task_config="$task_dir/.config"
+
+    # Verifica se o arquivo de configuração existe
+    if [[ ! -f "$task_config" ]]; then
+        echo "Config file not found for project $project_name"
+        return 1
+    fi
+
+    # Obtém o valor atual do status
+    local current_value=$(grep "$status_type:" "$task_config" | cut -d ':' -f 2 | xargs)
+
+    # Calcula o novo valor
+    local new_value=$(expr $current_value + $sum)
+
+    # Atualiza o valor no arquivo de configuração
+    sed -i "s/^$status_type:.*/$status_type:$new_value/" "$task_config"
+}
+
+add_task() {
+	local project_name=$1
+	local task_name=$2
+	local task_file="$TASKS_DIR/$project_name/$(sanitize_name "$task_name").todo"
+	local count="$(get_task_status $project_name "count")"
+	# Verifica se a tarefa já existe
+	if [ -f "$task_file" ]; then
+		print_colored "Task '$task_name' already exists." "yellowb"
+		exit 1
+	fi
+	
+	# Cria o arquivo .todo
+	echo "Name:$task_name" > "$task_file"
+	echo "Status:not_started" >> "$task_file"
+	echo "Number:$(expr $count + 1)" >> "$task_file"
+	atualize_task_status "$project_name" "count" 1
+	atualize_task_status "$project_name" "not_started" 1
+	print_colored "Task '$task_name' added in project '$project_name'." "greenb"
+}
+
+delete_task() {
+	local project_name=$1
+	local task_name="$2"
+	local task_dir="$TASKS_DIR/$project_name"
+	local task_file="$task_dir/$(sanitize_name "$task_name").todo"
+	shift 1
+	if [ ! -f "$task_file" ]; then
+		print_colored "Task '$task_name' not found." "yellowb"
+		exit 0
+	fi
+	
+	echo "Are you sure you want to delete this tasks? (S/n)"
+	read response	
+	case $response in
+		[Ss])
+			if [ "$1" = "--all" ]; then
+				if [ -z "$(ls -A $task_dir)" ] ; then
+					print_colored "Project $project_name haven't tasks" "yellowb"
+				else
+					rm "$task_dir"/*
+					echo "count:0" > "$task_dir/.config"
+					echo "not_started:0" >> "$task_dir/.config"
+					echo "in_progress:0" >> "$task_dir/.config"
+					echo "done:0" >> "$task_dir/.config"
+					print_colored "All notes deleted for project '$project_name'" "greenb"
+				fi
+			else
+				local task_status=$(grep "Status:" "$task_file" | cut -d ':' -f 2 | xargs)
+				rm "$task_file"
+				atualize_task_status "$project_name" "$task_status" -1
+				print_colored "Task '$task_name' removed for project '$project_name'" "greenb"
+			fi
+			;;
+		[Nn]|*)
+			print_colored "Canceled!" "greenb"
+			;;
+	esac
+}
+view_task() {
+	local project_name=$1
+	local task_dir="$TASKS_DIR/$project_name"
+	local task_config="$task_dir/.config"
+	shift 1
+
+	# Verifica se há tarefas no diretório
+	if [ -z "$(ls -A "$task_dir"/*.todo 2>/dev/null)" ]; then
+		print_colored "No tasks found for project '$project_name'." "yellowb"
+		return 0
+	fi
+
+	# Array para armazenar as tarefas e seus números
+	local tasks=()
+
+	# Lê cada arquivo .todo e extrai o número, nome e status
+	for task_file in "$task_dir"/*.todo; do
+		local task_number=$(grep "Number:" "$task_file" | cut -d ':' -f 2 | xargs)
+		local task_name=$(grep "Name:" "$task_file" | cut -d ':' -f 2 | xargs)
+		local task_status=$(grep "Status:" "$task_file" | cut -d ':' -f 2 | xargs)
+		tasks+=("$task_number:$task_name:$task_status")
+	done
+
+	# Ordena as tarefas com base no número (ordem crescente)
+	IFS=$'\n' sorted_tasks=($(sort -n <<< "${tasks[*]}"))
+	unset IFS
+
+	# Exibe as tarefas ordenadas
+	for task in "${sorted_tasks[@]}"; do
+		local task_number=$(echo "$task" | cut -d ':' -f 1)
+		local task_name=$(echo "$task" | cut -d ':' -f 2)
+		local task_status=$(echo "$task" | cut -d ':' -f 3)
+		case "$task_status" in
+			"not_started")
+				formatted_status="Not Started"
+				color="redb"
+				;;
+			"in_progress")
+				formatted_status="In Progress"
+				color="yellowb"
+				;;
+			"done")
+				formatted_status="Done"
+				color="greenb"
+				;;
+			*)
+				formatted_status="$task_status"
+				color="blueb"
+			;;
+		esac
+
+		# Exibe a tarefa com o status colorido
+		colored_status=$(print_colored "$formatted_status" "$color")
+		echo "$task_number $task_name ($colored_status)"
+		echo
+	done
+
+	# Exibe o resumo
+	local not_started=$(get_task_status "$project_name" "not_started")
+	local in_progress=$(get_task_status "$project_name" "in_progress")
+	local done=$(get_task_status "$project_name" "done")
+
+	echo
+	echo "Summary:"
+	local s_not_started=$(print_colored "Not started: $not_started" "redb")
+	local s_in_progress=$(print_colored "In progress: $in_progress" "yellowb")
+	local s_done=$(print_colored "Done: $done" "greenb")
+	echo "$s_not_started | $s_in_progress | $s_done"
+}
+
+change_task_status() {
+	local project_name=$1
+	local task_name=$2
+	local new_status=$3
+
+	local task_dir="$TASKS_DIR/$project_name"
+	local task_file="$task_dir/$(sanitize_name "$task_name").todo"
+
+	# Verifica se a tarefa existe
+	if [ ! -f "$task_file" ]; then
+		print_colored "Task '$task_name' not found in project '$project_name'." "redb"
+		return 1
+	fi
+
+	# Obtém o status atual da tarefa
+	local current_status=$(grep "Status:" "$task_file" | cut -d ':' -f 2 | xargs)
+
+	# Verifica se o novo status é válido
+	case "$new_status" in
+		"not_started" | "in_progress" | "done")
+			;;
+		*)
+			print_colored "Invalid status: '$new_status'. Use 'not_started', 'in_progress', or 'done'." "redb"
+			return 1
+		;;
+	esac
+
+	# Atualiza o status da tarefa no arquivo .todo
+	sed -i "s/^Status:.*/Status:$new_status/" "$task_file"
+
+	# Atualiza os contadores de status no arquivo .config
+	atualize_task_status "$project_name" "$current_status" -1
+	atualize_task_status "$project_name" "$new_status" 1
+
+	print_colored "Task '$task_name' status changed from '$current_status' to '$new_status'." "greenb"
+}
+
+menage_tasks() {
+	local action=$1	
+	local project_name=$(verify_project_name $2)
+	local task_dir="$TASKS_DIR/$project_name"
+	local task_name=$2
+	local task_config="$task_dir/.config"
+	shift 1
+
+	if [ "$action" = "help" ]; then
+		show_help_notes
+		return 0
+	fi
+
+	if [ ! -d "$task_dir" ]; then
+		mkdir -p "$task_dir"
+		echo "count:0" > $task_config
+		echo "not_started:0" >> $task_config
+		echo "in_progress:0" >> $task_config
+		echo "done:0" >> $task_config
+	fi
+
+	case $action in
+		"add")
+			add_task "$project_name" "$task_name"
+			;;
+		"view")
+			view_task "$project_name"
+			;;
+		"delete")
+			delete_task "$project_name" "$task_name"
+			;;
+		"start")
+			change_task_status "$project_name" "$task_name" "in_progress"
+			;;
+		"do")
+			change_task_status "$project_name" "$task_name" "done"
+			;;
+		"reset")
+			change_task_status "$project_name" "$task_name" "not_started"
+			;;
+	esac
+	# echo 
 }
 
 # Função de ajuda
@@ -706,6 +984,11 @@ while [[ $# -gt 0 ]]; do
 		--notes)
 			shift 1
 			menage_notes "$@"
+			exit 0
+			;;
+		--to-do)
+			shift 1
+			menage_tasks "$@"
 			exit 0
 			;;
 		*)
