@@ -875,7 +875,7 @@ menage_tasks() {
 	shift 1
 
 	if [ "$action" = "help" ]; then
-		show_help_notes
+		show_help_tasks
 		return 0
 	fi
 
@@ -946,6 +946,47 @@ menage_tasks() {
 	# echo 
 }
 
+show_help_tasks() {
+    echo -e "\033[1;37mUsage: \033[1;32massistinette --tasks [action] [project_name] [task_name/number] [options]\033[0m"
+    echo
+    echo -e "\033[1;37mActions:\033[0m"
+    echo -e "  \033[1;32madd\033[0m <project_name> <task_name>               Add a new task to the project"
+    echo -e "  \033[1;32mview\033[0m <project_name>                          View all tasks in the project"
+    echo -e "  \033[1;32mdelete\033[0m <project_name> <task_name/number>     Delete a specific task or multiple tasks"
+    echo -e "  \033[1;32mstart\033[0m <project_name> <task_name/number>      Mark a task as 'in progress'"
+    echo -e "  \033[1;32mdo\033[0m <project_name> <task_name/number>         Mark a task as 'done'"
+    echo -e "  \033[1;32mreset\033[0m <project_name> <task_name/number>      Reset a task to 'not started'"
+    echo -e "  \033[1;32mhelp\033[0m                                        Show this help message"
+    echo
+    echo -e "\033[1;37mOptions:\033[0m"
+    echo -e "  \033[1;32mcommit\033[0m                                      (For 'do' action) Automatically commit changes to Git with task names as the commit message"
+    echo -e "  \033[1;32m--all\033[0m                                       (For 'delete' action) Delete all tasks in the project"
+    echo
+    echo -e "\033[1;37mExamples:\033[0m"
+    echo -e "  \033[1;32massistinette --tasks add my_project \"Task 1\"\033[0m"
+    echo -e "  \033[1;32massistinette --tasks view my_project\033[0m"
+    echo -e "  \033[1;32massistinette --tasks delete my_project \"Task 1\"\033[0m"
+    echo -e "  \033[1;32massistinette --tasks delete my_project 1 2 3\033[0m"
+    echo -e "  \033[1;32massistinette --tasks delete my_project --all\033[0m"
+    echo -e "  \033[1;32massistinette --tasks start my_project \"Task 1\"\033[0m"
+    echo -e "  \033[1;32massistinette --tasks do my_project \"Task 1\"\033[0m"
+    echo -e "  \033[1;32massistinette --tasks do my_project commit \"Task 1\"\033[0m"
+    echo -e "  \033[1;32massistinette --tasks do my_project commit 1 2 3\033[0m"
+    echo -e "  \033[1;32massistinette --tasks reset my_project \"Task 1\"\033[0m"
+    echo -e "  \033[1;32massistinette --tasks help\033[0m"
+    echo
+    echo -e "\033[1;37mNotes:\033[0m"
+    echo -e "  \033[1;33m- If you are inside the project directory, you can omit the <project_name>.\033[0m"
+    echo -e "  - Tasks can be referenced by their \033[1;32mname\033[0m or \033[1;32mnumber\033[0m (as shown in the 'view' action)."
+    echo -e "  - For \033[1;32mdelete\033[0m, \033[1;32mstart\033[0m, \033[1;32mdo\033[0m, and \033[1;32mreset\033[0m, you can pass multiple tasks (names or numbers) in any order."
+    echo -e "  - When using the \033[1;32mcommit\033[0m option with the \033[1;32mdo\033[0m action, the commit message will include all task names separated by \033[1;34m;\033[0m and end with \033[1;34m| Done\033[0m."
+    echo -e "    Example:"
+    echo -e "      \033[1;32massistinette --tasks do my_project commit \"Task 1\" 2 \"Task 3\"\033[0m"
+    echo -e "      Commit message: \033[1;34mTask 1; Task 2; Task 3 | Done\033[0m"
+    echo -e "  - Use \033[1;32m--all\033[0m with the \033[1;32mdelete\033[0m action to remove all tasks in the project."
+    echo -e "  - The \033[1;32mview\033[0m action shows a summary of tasks by status: \033[1;31mNot Started\033[0m, \033[1;33mIn Progress\033[0m, and \033[1;32mDone\033[0m."
+}
+
 # Função de ajuda
 show_help() {
     echo "Usage: $0 [options]"
@@ -963,6 +1004,7 @@ show_help() {
     echo "  -v                           View all projects"
     echo -e "  -g <name>                    \033[3;33mGet the path to the project (use as: cd \$(assistinette -g project_name))\033[0m"
     echo "  --notes                      Manage notes for projects (use '--notes help' for more details)"
+    echo "  --tasks                      Manage tasks for projects (use '--tasks help' for more details)"
 }
 
 # Verificar argumentos
@@ -1040,7 +1082,7 @@ while [[ $# -gt 0 ]]; do
 			menage_notes "$@"
 			exit 0
 			;;
-		--to-do)
+		--tasks)
 			shift 1
 			menage_tasks "$@"
 			exit 0
