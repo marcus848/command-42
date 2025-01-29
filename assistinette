@@ -660,6 +660,24 @@ get_task_status() {
     echo "$result"
 }
 
+get_task_by_number() {
+    local project_name=$1
+    local task_number=$2
+    local task_dir="$TASKS_DIR/$project_name"
+
+    # Busca o arquivo .todo que contém o número da tarefa
+    local task_file=$(find "$task_dir" -name "*.todo" -type f -exec grep -l "Number:$task_number" {} +)
+
+    if [ -z "$task_file" ]; then
+        print_colored "Task with number '$task_number' not found in project '$project_name'." "redb"
+        return 1
+    fi
+
+    # Extrai o nome da tarefa do arquivo .todo
+    local task_name=$(grep "Name:" "$task_file" | cut -d ':' -f 2 | xargs)
+    echo "$task_name"
+}
+
 atualize_task_status() {
     local project_name=$1
     local status_type=$2
@@ -876,17 +894,53 @@ menage_tasks() {
 		"view")
 			view_task "$project_name"
 			;;
-		"delete")
-			delete_task "$project_name" "$task_name"
+		"delete" | "start" | "do" | "reset")
+			local commit_flag=false
+			if [[ "$action" == "do" && "$1" == "commit" ]]; then
+				commit_flag=true
+				shift 1
+			fi
+
+			local commit_messages=()
+
+			for task_identifier in "$@"; do
+				if [[ "$task_identifier" =~ ^[0-9]+$ ]]; then
+					task_name=$(get_task_by_number "$project_name" "$task_identifier")
+					if [ $? -ne 0 ]; then
+						continue 
+					fi
+				else
+					task_name="$task_identifier"
+				fi
+
+				case $action in
+				"delete")
+					delete_task "$project_name" "$task_name"
+					;;
+				"start")
+					change_task_status "$project_name" "$task_name" "in_progress"
+					;;
+				"do")
+					change_task_status "$project_name" "$task_name" "done"
+					if $commit_flag; then
+						commit_messages+=("$task_name")
+					fi
+					;;
+				"reset")
+					change_task_status "$project_name" "$task_name" "not_started"
+					;;
+				esac
+			done
+			
+			if $commit_flag && [ ${#commit_messages[@]} -gt 0 ]; then
+				local commit_message=$(IFS="; "; echo "${commit_messages[*]} | Done")
+				git add .
+				git commit -m "$commit_message"
+				print_colored "Git commit created with message: '$commit_message'" "greenb"
+			fi
 			;;
-		"start")
-			change_task_status "$project_name" "$task_name" "in_progress"
-			;;
-		"do")
-			change_task_status "$project_name" "$task_name" "done"
-			;;
-		"reset")
-			change_task_status "$project_name" "$task_name" "not_started"
+		*)
+			print_colored "Invalid action: '$action'. Use 'add', 'view', 'delete', 'start', 'do', or 'reset'." "redb"
 			;;
 	esac
 	# echo 
