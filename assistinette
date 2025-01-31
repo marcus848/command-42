@@ -474,7 +474,9 @@ menage_notes() {
 		"view")
 			shift 1
 			for file in $@; do
-				file="$(sanitize_name "$file")"
+				if [[ ! $file =~ ^# ]]; then
+					file="$(sanitize_name "$file")"
+				fi
 				note_name=$file
 				note_file="$notes_dir/$note_name"
 				if [ -z "$(ls -A $notes_dir)" ]; then
