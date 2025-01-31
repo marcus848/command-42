@@ -282,7 +282,6 @@ go_project_path() {
 	local project_path
 
 	project_path=$(get_project_path $project_name)
-
 	if [ -z $project_path ]; then
 		echo "$HOME"
 	else
@@ -370,7 +369,8 @@ while [[ $# -gt 0 ]]; do
 			exit 0
 			;;
 		-g)
-			go_project_path "$2"
+			shift 1
+			go_project_path "$1"
 			shift 1
 			;;
 		-h)
